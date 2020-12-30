@@ -314,6 +314,7 @@ v2ray_install() {
     mkdir -p /root/v2ray
     cd /root/v2ray || exit
     wget -N --no-check-certificate https://raw.githubusercontent.com/v2fly/fhs-install-v2ray/${github_branch}/install-release.sh
+    mv install-release.sh v2ray.sh
 
     if [[ -f v2ray.sh ]]; then
         rm -rf $v2ray_systemd_file
