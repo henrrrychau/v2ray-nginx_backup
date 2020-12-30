@@ -180,9 +180,6 @@ dependency_install() {
     ${INS} -y install unzip
     judge "安装 unzip"
 
-    ${INS} -y install qrencode
-    judge "安装 qrencode"
-
     ${INS} -y install curl
     judge "安装 curl"
 
@@ -670,8 +667,6 @@ EOF
 vmess_qr_link_image() {
     vmess_link="vmess://$(base64 -w 0 $v2ray_qr_config_file)"
     {
-        echo -e "$Red 二维码: $Font"
-        echo -n "${vmess_link}" | qrencode -o - -t utf8
         echo -e "${Red} URL导入链接:${vmess_link} ${Font}"
     } >>"${v2ray_info_file}"
 }
@@ -682,8 +677,6 @@ vmess_quan_link_image() {
     certificate=1, obfs=ws, obfs-path="\"$(info_extraction '\"path\"')\"", " > /tmp/vmess_quan.tmp
     vmess_link="vmess://$(base64 -w 0 /tmp/vmess_quan.tmp)"
     {
-        echo -e "$Red 二维码: $Font"
-        echo -n "${vmess_link}" | qrencode -o - -t utf8
         echo -e "${Red} URL导入链接:${vmess_link} ${Font}"
     } >>"${v2ray_info_file}"
 }
