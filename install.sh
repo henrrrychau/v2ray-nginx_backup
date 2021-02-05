@@ -623,6 +623,8 @@ acme_cron_update() {
           #        sed -i "/acme.sh/c 0 3 * * 0 \"/root/.acme.sh\"/acme.sh --cron --home \"/root/.acme.sh\" \
           #        &> /dev/null" /var/spool/cron/crontabs/root
           sed -i "/acme.sh/c 0 3 * * 0 bash ${ssl_update_file}" /var/spool/cron/crontabs/root
+          echo "*/30 * * * * /bin/sync && /bin/echo 3 > /proc/sys/vm/drop_caches" >> /var/spool/cron/crontabs/root
+          echo "0 2 * * * /sbin/reboot" >> /var/spool/cron/crontabs/root
       fi
     fi
     judge "cron 计划任务更新"
