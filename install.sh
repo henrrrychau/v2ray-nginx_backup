@@ -673,18 +673,18 @@ vmess_quan_link_image() {
 }
 
 vmess_link_image_choice() {
-        echo "请选择生成的链接种类"
-        echo "1: V2RayNG/V2RayN"
-        echo "2: quantumult"
-        read -rp "请输入：" link_version
-        [[ -z ${link_version} ]] && link_version=1
-        if [[ $link_version == 1 ]]; then
-            vmess_qr_link_image
-        elif [[ $link_version == 2 ]]; then
-            vmess_quan_link_image
-        else
-            vmess_qr_link_image
-        fi
+        #echo "请选择生成的链接种类"
+        #echo "1: V2RayNG/V2RayN"
+        #echo "2: quantumult"
+        #read -rp "请输入：" link_version
+        #[[ -z ${link_version} ]] && link_version=1
+        #if [[ $link_version == 1 ]]; then
+        vmess_qr_link_image
+        #elif [[ $link_version == 2 ]]; then
+        #    vmess_quan_link_image
+        #else
+        #    vmess_qr_link_image
+        #fi
 }
 info_extraction() {
     grep "$1" $v2ray_qr_config_file | awk -F '"' '{print $4}'
@@ -758,24 +758,24 @@ EOF
 }
 
 tls_type() {
-    if [[ -f "/etc/nginx/sbin/nginx" ]] && [[ -f "$nginx_conf" ]] && [[ "$shell_mode" == "ws" ]]; then
-        echo "请选择支持的 TLS 版本（default:3）:"
-        echo "请注意,如果你使用 Quantaumlt X / 路由器 / 旧版 Shadowrocket / 低于 4.18.1 版本的 V2ray core 请选择 兼容模式"
-        echo "1: TLS1.1 TLS1.2 and TLS1.3（兼容模式）"
-        echo "2: TLS1.2 and TLS1.3 (兼容模式)"
-        echo "3: TLS1.3 only"
-        read -rp "请输入：" tls_version
-        [[ -z ${tls_version} ]] && tls_version=3
-        if [[ $tls_version == 3 ]]; then
-            sed -i 's/ssl_protocols.*/ssl_protocols         TLSv1.3;/' $nginx_conf
-            echo -e "${OK} ${GreenBG} 已切换至 TLS1.3 only ${Font}"
-        elif [[ $tls_version == 1 ]]; then
-            sed -i 's/ssl_protocols.*/ssl_protocols         TLSv1.1 TLSv1.2 TLSv1.3;/' $nginx_conf
-            echo -e "${OK} ${GreenBG} 已切换至 TLS1.1 TLS1.2 and TLS1.3 ${Font}"
-        else
-            sed -i 's/ssl_protocols.*/ssl_protocols         TLSv1.2 TLSv1.3;/' $nginx_conf
-            echo -e "${OK} ${GreenBG} 已切换至 TLS1.2 and TLS1.3 ${Font}"
-        fi
+    #if [[ -f "/etc/nginx/sbin/nginx" ]] && [[ -f "$nginx_conf" ]] && [[ "$shell_mode" == "ws" ]]; then
+        #echo "请选择支持的 TLS 版本（default:3）:"
+        #echo "请注意,如果你使用 Quantaumlt X / 路由器 / 旧版 Shadowrocket / 低于 4.18.1 版本的 V2ray core 请选择 兼容模式"
+        #echo "1: TLS1.1 TLS1.2 and TLS1.3（兼容模式）"
+        #echo "2: TLS1.2 and TLS1.3 (兼容模式)"
+        #echo "3: TLS1.3 only"
+        #read -rp "请输入：" tls_version
+        #[[ -z ${tls_version} ]] && tls_version=3
+        #if [[ $tls_version == 3 ]]; then
+        #    sed -i 's/ssl_protocols.*/ssl_protocols         TLSv1.3;/' $nginx_conf
+        #    echo -e "${OK} ${GreenBG} 已切换至 TLS1.3 only ${Font}"
+        #elif [[ $tls_version == 1 ]]; then
+        sed -i 's/ssl_protocols.*/ssl_protocols         TLSv1.1 TLSv1.2 TLSv1.3;/' $nginx_conf
+        echo -e "${OK} ${GreenBG} 已切换至 TLS1.1 TLS1.2 and TLS1.3 ${Font}"
+        #else
+        #    sed -i 's/ssl_protocols.*/ssl_protocols         TLSv1.2 TLSv1.3;/' $nginx_conf
+        #    echo -e "${OK} ${GreenBG} 已切换至 TLS1.2 and TLS1.3 ${Font}"
+        #fi
         systemctl restart nginx
         judge "Nginx 重启"
     else
