@@ -758,7 +758,7 @@ EOF
 }
 
 tls_type() {
-    #if [[ -f "/etc/nginx/sbin/nginx" ]] && [[ -f "$nginx_conf" ]] && [[ "$shell_mode" == "ws" ]]; then
+    if [[ -f "/etc/nginx/sbin/nginx" ]] && [[ -f "$nginx_conf" ]] && [[ "$shell_mode" == "ws" ]]; then
         #echo "请选择支持的 TLS 版本（default:3）:"
         #echo "请注意,如果你使用 Quantaumlt X / 路由器 / 旧版 Shadowrocket / 低于 4.18.1 版本的 V2ray core 请选择 兼容模式"
         #echo "1: TLS1.1 TLS1.2 and TLS1.3（兼容模式）"
@@ -779,7 +779,7 @@ tls_type() {
         systemctl restart nginx
         judge "Nginx 重启"
     else
-        echo -e "${Error} ${RedBG} Nginx 或 配置文件不存在 或当前安装版本为 h2 ，请正确安装脚本后执行${Font}"
+        #echo -e "${Error} ${RedBG} Nginx 或 配置文件不存在 或当前安装版本为 h2 ，请正确安装脚本后执行${Font}"
     fi
 }
 show_access_log() {
