@@ -29,7 +29,7 @@ OK="${Green}[OK]${Font}"
 Error="${Red}[错误]${Font}"
 
 # 版本
-shell_version="1.1.5.7"
+shell_version="1.1.8.4"
 shell_mode="None"
 github_branch="master"
 version_cmp="/tmp/version_cmp.tmp"
@@ -41,7 +41,8 @@ nginx_dir="/etc/nginx"
 web_dir="/home/wwwroot"
 nginx_openssl_src="/usr/local/src"
 v2ray_bin_dir_old="/usr/bin/v2ray"
-v2ray_bin_dir="/usr/local/bin"
+v2ray_bin_dir="/usr/local/bin/v2ray"
+v2ctl_bin_dir="/usr/local/bin/v2ctl"
 v2ray_info_file="$HOME/v2ray_info.inf"
 v2ray_qr_config_file="/usr/local/vmess_qr.json"
 nginx_systemd_file="/etc/systemd/system/nginx.service"
@@ -50,8 +51,8 @@ v2ray_access_log="/var/log/v2ray/access.log"
 v2ray_error_log="/var/log/v2ray/error.log"
 amce_sh_file="/root/.acme.sh/acme.sh"
 ssl_update_file="/usr/bin/ssl_update.sh"
-nginx_version="1.18.0"
-openssl_version="1.1.1g"
+nginx_version="1.20.1"
+openssl_version="1.1.1k"
 jemalloc_version="5.2.1"
 old_config_status="off"
 # v2ray_plugin_version="$(wget -qO- "https://github.com/shadowsocks/v2ray-plugin/tags" | grep -E "/shadowsocks/v2ray-plugin/releases/tag/" | head -1 | sed -r 's/.*tag\/v(.+)\">.*/\1/')"
@@ -83,6 +84,10 @@ check_system() {
     elif [[ "${ID}" == "ubuntu" && $(echo "${VERSION_ID}" | cut -d '.' -f1) -ge 16 ]]; then
         echo -e "${OK} ${GreenBG} 当前系统为 Ubuntu ${VERSION_ID} ${UBUNTU_CODENAME} ${Font}"
         INS="apt"
+        rm /var/lib/dpkg/lock
+        dpkg --configure -a
+        rm /var/lib/apt/lists/lock
+        rm /var/cache/apt/archives/lock
         $INS update
     else
         echo -e "${Error} ${RedBG} 当前系统为 ${ID} ${VERSION_ID} 不在支持的系统列表内，安装中断 ${Font}"
@@ -140,8 +145,18 @@ chrony_install() {
     chronyc sourcestats -v
     chronyc tracking -v
     date
-    echo -e "${GreenBG} 继续安装 ${Font}"
-    sleep 2
+    read -rp "请确认时间是否准确,误差范围±3分钟(Y/N): " chrony_install
+    [[ -z ${chrony_install} ]] && chrony_install="Y"
+    case $chrony_install in
+    [yY][eE][sS] | [yY])
+        echo -e "${GreenBG} 继续安装 ${Font}"
+        sleep 2
+        ;;
+    *)
+        echo -e "${RedBG} 安装终止 ${Font}"
+        exit 2
+        ;;
+    esac
 }
 
 dependency_install() {
@@ -169,6 +184,9 @@ dependency_install() {
 
     ${INS} -y install unzip
     judge "安装 unzip"
+
+    ${INS} -y install qrencode
+    judge "安装 qrencode"
 
     ${INS} -y install curl
     judge "安装 curl"
@@ -205,6 +223,8 @@ dependency_install() {
         systemctl start haveged && systemctl enable haveged
         #       judge "haveged 启动"
     fi
+
+    mkdir -p /usr/local/bin >/dev/null 2>&1
 }
 basic_optimization() {
     # 最大文件打开数
@@ -300,7 +320,7 @@ v2ray_install() {
     fi
     mkdir -p /root/v2ray
     cd /root/v2ray || exit
-    wget -N --no-check-certificate https://raw.githubusercontent.com/wulabing/V2Ray_ws-tls_bash_onekey/master/v2ray.sh
+    wget -N --no-check-certificate https://raw.githubusercontent.com/wulabing/V2Ray_ws-tls_bash_onekey/${github_branch}/v2ray.sh
 
     if [[ -f v2ray.sh ]]; then
         rm -rf $v2ray_systemd_file
@@ -368,6 +388,7 @@ nginx_install() {
 
     ./configure --prefix="${nginx_dir}" \
         --with-http_ssl_module \
+        --with-http_sub_module \
         --with-http_gzip_static_module \
         --with-http_stub_status_module \
         --with-pcre \
@@ -451,6 +472,7 @@ port_exist_check() {
     fi
 }
 acme() {
+    "$HOME"/.acme.sh/acme.sh --set-default-ca --server letsencrypt
     if "$HOME"/.acme.sh/acme.sh --issue -d "${domain}" --standalone -k ec-256 --force --test; then
         echo -e "${OK} ${GreenBG} SSL 证书测试签发成功，开始正式签发 ${Font}"
         rm -rf "$HOME/.acme.sh/${domain}_ecc"
@@ -531,8 +553,8 @@ nginx_conf_add() {
 
         location /ray/
         {
-        proxy_read_timeout 650s;
         proxy_redirect off;
+        proxy_read_timeout 1200s;
         proxy_pass http://127.0.0.1:10000;
         proxy_http_version 1.1;
         proxy_set_header X-Real-IP \$remote_addr;
@@ -613,8 +635,6 @@ acme_cron_update() {
           #        sed -i "/acme.sh/c 0 3 * * 0 \"/root/.acme.sh\"/acme.sh --cron --home \"/root/.acme.sh\" \
           #        &> /dev/null" /var/spool/cron/crontabs/root
           sed -i "/acme.sh/c 0 3 * * 0 bash ${ssl_update_file}" /var/spool/cron/crontabs/root
-          echo "*/30 * * * * /bin/sync && /bin/echo 3 > /proc/sys/vm/drop_caches" >> /var/spool/cron/crontabs/root
-          echo "0 2 * * * /sbin/reboot" >> /var/spool/cron/crontabs/root
       fi
     fi
     judge "cron 计划任务更新"
@@ -658,6 +678,8 @@ EOF
 vmess_qr_link_image() {
     vmess_link="vmess://$(base64 -w 0 $v2ray_qr_config_file)"
     {
+        echo -e "$Red 二维码: $Font"
+        echo -n "${vmess_link}" | qrencode -o - -t utf8
         echo -e "${Red} URL导入链接:${vmess_link} ${Font}"
     } >>"${v2ray_info_file}"
 }
@@ -668,23 +690,25 @@ vmess_quan_link_image() {
     certificate=1, obfs=ws, obfs-path="\"$(info_extraction '\"path\"')\"", " > /tmp/vmess_quan.tmp
     vmess_link="vmess://$(base64 -w 0 /tmp/vmess_quan.tmp)"
     {
+        echo -e "$Red 二维码: $Font"
+        echo -n "${vmess_link}" | qrencode -o - -t utf8
         echo -e "${Red} URL导入链接:${vmess_link} ${Font}"
     } >>"${v2ray_info_file}"
 }
 
 vmess_link_image_choice() {
-        #echo "请选择生成的链接种类"
-        #echo "1: V2RayNG/V2RayN"
-        #echo "2: quantumult"
-        #read -rp "请输入：" link_version
-        #[[ -z ${link_version} ]] && link_version=1
-        #if [[ $link_version == 1 ]]; then
-        vmess_qr_link_image
-        #elif [[ $link_version == 2 ]]; then
-        #    vmess_quan_link_image
-        #else
-        #    vmess_qr_link_image
-        #fi
+        echo "请选择生成的链接种类"
+        echo "1: V2RayNG/V2RayN"
+        echo "2: quantumult"
+        read -rp "请输入：" link_version
+        [[ -z ${link_version} ]] && link_version=1
+        if [[ $link_version == 1 ]]; then
+            vmess_qr_link_image
+        elif [[ $link_version == 2 ]]; then
+            vmess_quan_link_image
+        else
+            vmess_qr_link_image
+        fi
 }
 info_extraction() {
     grep "$1" $v2ray_qr_config_file | awk -F '"' '{print $4}'
@@ -759,23 +783,23 @@ EOF
 
 tls_type() {
     if [[ -f "/etc/nginx/sbin/nginx" ]] && [[ -f "$nginx_conf" ]] && [[ "$shell_mode" == "ws" ]]; then
-        #echo "请选择支持的 TLS 版本（default:3）:"
-        #echo "请注意,如果你使用 Quantaumlt X / 路由器 / 旧版 Shadowrocket / 低于 4.18.1 版本的 V2ray core 请选择 兼容模式"
-        #echo "1: TLS1.1 TLS1.2 and TLS1.3（兼容模式）"
-        #echo "2: TLS1.2 and TLS1.3 (兼容模式)"
-        #echo "3: TLS1.3 only"
-        #read -rp "请输入：" tls_version
-        #[[ -z ${tls_version} ]] && tls_version=3
-        #if [[ $tls_version == 3 ]]; then
-        #    sed -i 's/ssl_protocols.*/ssl_protocols         TLSv1.3;/' $nginx_conf
-        #    echo -e "${OK} ${GreenBG} 已切换至 TLS1.3 only ${Font}"
-        #elif [[ $tls_version == 1 ]]; then
-        sed -i 's/ssl_protocols.*/ssl_protocols         TLSv1.1 TLSv1.2 TLSv1.3;/' $nginx_conf
-        echo -e "${OK} ${GreenBG} 已切换至 TLS1.1 TLS1.2 and TLS1.3 ${Font}"
-        #else
-        #    sed -i 's/ssl_protocols.*/ssl_protocols         TLSv1.2 TLSv1.3;/' $nginx_conf
-        #    echo -e "${OK} ${GreenBG} 已切换至 TLS1.2 and TLS1.3 ${Font}"
-        #fi
+        echo "请选择支持的 TLS 版本（default:3）:"
+        echo "请注意,如果你使用 Quantaumlt X / 路由器 / 旧版 Shadowrocket / 低于 4.18.1 版本的 V2ray core 请选择 兼容模式"
+        echo "1: TLS1.1 TLS1.2 and TLS1.3（兼容模式）"
+        echo "2: TLS1.2 and TLS1.3 (兼容模式)"
+        echo "3: TLS1.3 only"
+        read -rp "请输入：" tls_version
+        [[ -z ${tls_version} ]] && tls_version=3
+        if [[ $tls_version == 3 ]]; then
+            sed -i 's/ssl_protocols.*/ssl_protocols         TLSv1.3;/' $nginx_conf
+            echo -e "${OK} ${GreenBG} 已切换至 TLS1.3 only ${Font}"
+        elif [[ $tls_version == 1 ]]; then
+            sed -i 's/ssl_protocols.*/ssl_protocols         TLSv1.1 TLSv1.2 TLSv1.3;/' $nginx_conf
+            echo -e "${OK} ${GreenBG} 已切换至 TLS1.1 TLS1.2 and TLS1.3 ${Font}"
+        else
+            sed -i 's/ssl_protocols.*/ssl_protocols         TLSv1.2 TLSv1.3;/' $nginx_conf
+            echo -e "${OK} ${GreenBG} 已切换至 TLS1.2 and TLS1.3 ${Font}"
+        fi
         systemctl restart nginx
         judge "Nginx 重启"
     else
@@ -803,9 +827,9 @@ mtproxy_sh() {
 
 uninstall_all() {
     stop_process_systemd
-    [[ -f $nginx_systemd_file ]] && rm -f $nginx_systemd_file
     [[ -f $v2ray_systemd_file ]] && rm -f $v2ray_systemd_file
-    [[ -d $v2ray_bin_dir ]] && rm -rf $v2ray_bin_dir
+    [[ -f $v2ray_bin_dir ]] && rm -f $v2ray_bin_dir
+    [[ -f $v2ctl_bin_dir ]] && rm -f $v2ctl_bin_dir
     [[ -d $v2ray_bin_dir_old ]] && rm -rf $v2ray_bin_dir_old
     if [[ -d $nginx_dir ]]; then
         echo -e "${OK} ${Green} 是否卸载 Nginx [Y/N]? ${Font}"
@@ -813,6 +837,7 @@ uninstall_all() {
         case $uninstall_nginx in
         [yY][eE][sS] | [yY])
             rm -rf $nginx_dir
+            rm -rf $nginx_systemd_file
             echo -e "${OK} ${Green} 已卸载 Nginx ${Font}"
             ;;
         *) ;;
@@ -821,8 +846,18 @@ uninstall_all() {
     fi
     [[ -d $v2ray_conf_dir ]] && rm -rf $v2ray_conf_dir
     [[ -d $web_dir ]] && rm -rf $web_dir
+    echo -e "${OK} ${Green} 是否卸载acme.sh及证书 [Y/N]? ${Font}"
+    read -r uninstall_acme
+    case $uninstall_acme in
+    [yY][eE][sS] | [yY])
+      /root/.acme.sh/acme.sh --uninstall
+      rm -rf /root/.acme.sh
+      rm -rf /data/*
+      ;;
+    *) ;;
+    esac
     systemctl daemon-reload
-    echo -e "${OK} ${GreenBG} 已卸载，SSL证书文件已保留 ${Font}"
+    echo -e "${OK} ${GreenBG} 已卸载 ${Font}"
 }
 delete_tls_key_and_crt() {
     [[ -f $HOME/.acme.sh/acme.sh ]] && /root/.acme.sh/acme.sh uninstall >/dev/null 2>&1
@@ -830,7 +865,7 @@ delete_tls_key_and_crt() {
     echo -e "${OK} ${GreenBG} 已清空证书遗留文件 ${Font}"
 }
 judge_mode() {
-    if [ -f $v2ray_bin_dir/v2ray ] || [ -f $v2ray_bin_dir_old/v2ray ]; then
+    if [ -f $v2ray_bin_dir ] || [ -f $v2ray_bin_dir_old/v2ray ]; then
         if grep -q "ws" $v2ray_qr_config_file; then
             shell_mode="ws"
         elif grep -q "h2" $v2ray_qr_config_file; then
@@ -1028,6 +1063,7 @@ menu() {
         start_process_systemd
         ;;
     14)
+        source '/etc/os-release'
         uninstall_all
         ;;
     15)
