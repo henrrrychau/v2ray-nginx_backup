@@ -241,7 +241,6 @@ modify_path() {
         camouflage="$(grep '\"path\"' $v2ray_qr_config_file | awk -F '"' '{print $4}')"
     fi
     sed -i "/\"path\"/c \\\t  \"path\":\"${camouflage}\"" ${v2ray_conf}
-    sed -i "/
     judge "V2ray 伪装路径 修改"
 }
 modify_alterid() {
