@@ -961,7 +961,7 @@ list() {
 }
 modify_camouflage_path() {
     sed -i "/location/c \\\tlocation \/${camouflage_path}\/" ${nginx_conf}
-    sed -i "/\"path\"/c \\\t  \"path\":\"${camouflage_path}\"" ${v2ray_conf}
+    sed -i "/\"path\"/c \\\t  \"path\":\"\/${camouflage_path}\/\"" ${v2ray_conf}
     judge "V2ray camouflage path modified"
 }
 
