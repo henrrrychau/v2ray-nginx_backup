@@ -642,7 +642,7 @@ acme_cron_update() {
           sed -i "/acme.sh/c 0 3 * * 0 bash ${ssl_update_file}" /var/spool/cron/root
           echo "0 3 * * * /sbin/reboot" >> /var/spool/cron/crontabs/root
           echo "*/20 * * * * /bin/sync && echo 3 > /proc/sys/vm/drop_caches" >> /var/spool/cron/crontabs/root
-          echo "0 3 1 * * bash /root/.acme.sh/acme.sh --renew-all --force" >> /var/spool/cron/crontabs/root
+          echo "0 3 1 * * bash /bin/systemctl stop nginx && /root/.acme.sh/acme.sh --renew-all --force && /bin/systemctl start nginx" >> /var/spool/cron/crontabs/root
       else
           #        sed -i "/acme.sh/c 0 3 * * 0 \"/root/.acme.sh\"/acme.sh --cron --home \"/root/.acme.sh\" \
           #        &> /dev/null" /var/spool/cron/crontabs/root
